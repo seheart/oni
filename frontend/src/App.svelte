@@ -1,5 +1,6 @@
 <script>
   let phases = $state([]);
+  let seeds = $state([]);
   let page = $state("home");
   let dark = $state(localStorage.getItem("oni-theme") === "dark");
 
@@ -26,6 +27,11 @@
     for (const p of phases) {
       ensureBuildForm(p.id);
     }
+  }
+
+  async function fetchSeeds() {
+    const res = await fetch("/api/seeds");
+    seeds = await res.json();
   }
 
   async function addPhase() {
@@ -91,6 +97,7 @@
 
   $effect(() => {
     fetchPhases();
+    fetchSeeds();
   });
 </script>
 
@@ -119,7 +126,21 @@
           <p class="lead">Plan and track your Oxygen Not Included colony builds by phase.</p>
         </div>
 
-        <!-- Add Phase -->
+        <!-- Seeds -->
+      {#if seeds.length > 0}
+        <section class="wiki-section seeds-box">
+          <h2 class="section-heading">Saved Seeds</h2>
+          {#each seeds as seed}
+            <div class="seed-item">
+              <code class="seed-code">{seed.seed}</code>
+              {#if seed.name}<span class="seed-name"> — {seed.name}</span>{/if}
+              {#if seed.notes}<span class="seed-notes"> ({seed.notes})</span>{/if}
+            </div>
+          {/each}
+        </section>
+      {/if}
+
+      <!-- Add Phase -->
         <section class="wiki-section">
           <h2 class="section-heading">Create New Phase</h2>
           <form onsubmit={(e) => { e.preventDefault(); addPhase(); }}>
@@ -554,6 +575,32 @@
     color: var(--text-muted);
     font-size: 0.85rem;
     font-family: var(--font-ui);
+  }
+
+  /* ===== SEEDS ===== */
+  .seed-item {
+    margin: 0.4rem 0;
+    font-family: var(--font-ui);
+    font-size: 0.9rem;
+  }
+
+  .seed-code {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 0.85rem;
+    background: var(--table-header-bg);
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--border-light);
+    user-select: all;
+  }
+
+  .seed-name {
+    font-weight: 600;
+  }
+
+  .seed-notes {
+    color: var(--text-muted);
+    font-size: 0.85rem;
   }
 
   /* ===== FORMS ===== */

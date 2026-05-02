@@ -35,6 +35,13 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (phase_id) REFERENCES phases(id) ON DELETE CASCADE
         );
+        CREATE TABLE IF NOT EXISTS seeds (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            seed TEXT NOT NULL,
+            name TEXT,
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
     """)
     conn.commit()
     conn.close()
@@ -162,6 +169,42 @@ def update_build(build_id):
 def delete_build(build_id):
     conn = get_db()
     conn.execute("DELETE FROM builds WHERE id = ?", (build_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+# --- Seeds ---
+
+@app.route("/api/seeds", methods=["GET"])
+def get_seeds():
+    conn = get_db()
+    seeds = conn.execute("SELECT * FROM seeds ORDER BY created_at DESC").fetchall()
+    conn.close()
+    return jsonify([dict(s) for s in seeds])
+
+
+@app.route("/api/seeds", methods=["POST"])
+def create_seed():
+    data = request.get_json()
+    seed = data.get("seed", "").strip()
+    if not seed:
+        return jsonify({"error": "Seed is required"}), 400
+    conn = get_db()
+    cur = conn.execute(
+        "INSERT INTO seeds (seed, name, notes) VALUES (?, ?, ?)",
+        (seed, data.get("name", "").strip(), data.get("notes", "").strip()),
+    )
+    conn.commit()
+    s = conn.execute("SELECT * FROM seeds WHERE id = ?", (cur.lastrowid,)).fetchone()
+    conn.close()
+    return jsonify(dict(s)), 201
+
+
+@app.route("/api/seeds/<int:seed_id>", methods=["DELETE"])
+def delete_seed(seed_id):
+    conn = get_db()
+    conn.execute("DELETE FROM seeds WHERE id = ?", (seed_id,))
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
