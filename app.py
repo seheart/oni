@@ -31,6 +31,7 @@ def init_db():
             materials TEXT,
             priority TEXT DEFAULT 'normal',
             status TEXT DEFAULT 'planned',
+            screenshot TEXT,
             sort_order INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (phase_id) REFERENCES phases(id) ON DELETE CASCADE
@@ -208,6 +209,26 @@ def delete_seed(seed_id):
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
+
+
+# --- Screenshots ---
+
+SCREENSHOTS_DIR = os.path.join(os.path.dirname(__file__), "screenshots")
+
+
+@app.route("/api/screenshots", methods=["GET"])
+def list_screenshots():
+    files = []
+    if os.path.exists(SCREENSHOTS_DIR):
+        for f in sorted(os.listdir(SCREENSHOTS_DIR)):
+            if f.lower().endswith((".png", ".jpg", ".jpeg")):
+                files.append(f)
+    return jsonify(files)
+
+
+@app.route("/screenshots/<path:filename>")
+def serve_screenshot(filename):
+    return send_from_directory(SCREENSHOTS_DIR, filename)
 
 
 if __name__ == "__main__":

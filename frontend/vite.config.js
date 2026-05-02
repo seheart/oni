@@ -5,7 +5,8 @@ export default defineConfig({
   plugins: [svelte()],
   server: {
     proxy: {
-      '/api': 'http://127.0.0.1:5000'
+      '/api': 'http://127.0.0.1:5000',
+      '/screenshots': 'http://127.0.0.1:5000'
     }
   }
 })

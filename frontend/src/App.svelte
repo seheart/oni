@@ -10,6 +10,18 @@
 
   // New build form (keyed by phase id)
   let buildForms = $state({});
+  let lightboxImg = $state(null);
+
+  function handleKeydown(e) {
+    if (e.key === 'Escape' && lightboxImg) {
+      lightboxImg = null;
+    }
+  }
+
+  $effect(() => {
+    window.addEventListener('keydown', handleKeydown);
+    return () => window.removeEventListener('keydown', handleKeydown);
+  });
 
   function toggleTheme() {
     dark = !dark;
@@ -184,43 +196,39 @@
 
             <!-- Builds list -->
             {#if phase.builds.length > 0}
-              <table>
-                <thead>
-                  <tr>
-                    <th class="col-status">Status</th>
-                    <th>Build</th>
-                    <th>Materials</th>
-                    <th class="col-priority">Priority</th>
-                    <th class="col-actions"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {#each phase.builds as build}
-                    <tr class="status-{build.status}">
-                      <td>
-                        <button class="status-btn" onclick={() => toggleBuildStatus(build)} title="Click to cycle status">
-                          {#if build.status === "planned"}
-                            <span class="status-tag tag-planned">planned</span>
-                          {:else if build.status === "in-progress"}
-                            <span class="status-tag tag-progress">in progress</span>
-                          {:else}
-                            <span class="status-tag tag-complete">complete</span>
-                          {/if}
-                        </button>
-                      </td>
-                      <td>
-                        <span class="build-name">{build.name}</span>
-                        {#if build.description}
-                          <span class="build-desc"> — {build.description}</span>
+              <div class="builds-list">
+                {#each phase.builds as build}
+                  <div class="build-card status-{build.status}">
+                    <div class="build-card-header">
+                      <button class="status-btn" onclick={() => toggleBuildStatus(build)} title="Click to cycle status">
+                        {#if build.status === "planned"}
+                          <span class="status-tag tag-planned">planned</span>
+                        {:else if build.status === "in-progress"}
+                          <span class="status-tag tag-progress">in progress</span>
+                        {:else}
+                          <span class="status-tag tag-complete">complete</span>
                         {/if}
-                      </td>
-                      <td class="build-materials">{build.materials || "—"}</td>
-                      <td><span class="priority-badge priority-{build.priority}">{build.priority}</span></td>
-                      <td><button class="btn-link-danger" onclick={() => deleteBuild(build.id)} title="Delete build">delete</button></td>
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
+                      </button>
+                      <span class="build-name">{build.name}</span>
+                      <span class="priority-badge priority-{build.priority}">{build.priority}</span>
+                      <button class="btn-link-danger" onclick={() => deleteBuild(build.id)} title="Delete build">delete</button>
+                    </div>
+                    {#if build.description}
+                      <p class="build-desc">{build.description}</p>
+                    {/if}
+                    {#if build.materials}
+                      <p class="build-materials">Materials: {build.materials}</p>
+                    {/if}
+                    {#if build.screenshot}
+                      <div class="build-screenshot">
+                        <button class="screenshot-btn" onclick={() => lightboxImg = `/screenshots/${build.screenshot}`}>
+                          <img src="/screenshots/{build.screenshot}" alt={build.name} loading="lazy" />
+                        </button>
+                      </div>
+                    {/if}
+                  </div>
+                {/each}
+              </div>
             {/if}
 
             <!-- Add build form -->
@@ -313,6 +321,13 @@
       {/if}
     </main>
   </div>
+
+  {#if lightboxImg}
+    <div class="lightbox" onclick={() => lightboxImg = null}>
+      <button class="lightbox-close" onclick={() => lightboxImg = null}>×</button>
+      <img src={lightboxImg} alt="Screenshot" />
+    </div>
+  {/if}
 
   <footer>
     <div class="container footer-inner">
@@ -747,48 +762,118 @@
     transition: width 0.3s;
   }
 
-  /* ===== TABLE ===== */
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.85rem;
+  /* ===== BUILD CARDS ===== */
+  .builds-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .build-card {
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    padding: 1rem;
+    background: var(--bg);
+  }
+
+  .build-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     font-family: var(--font-ui);
-    margin-bottom: 0.5rem;
-  }
-
-  th, td {
-    padding: 0.4rem 0.6rem;
-    text-align: left;
-    border: 1px solid var(--table-border);
-  }
-
-  th {
-    background: var(--table-header-bg);
-    font-size: 0.8rem;
-    font-weight: 600;
-  }
-
-  .col-status { width: 100px; }
-  .col-priority { width: 80px; }
-  .col-actions { width: 50px; text-align: center; }
-
-  tr.status-complete .build-name {
-    text-decoration: line-through;
-    color: var(--text-muted);
   }
 
   .build-name {
     font-weight: 600;
+    font-size: 0.9rem;
+    flex: 1;
+  }
+
+  .build-card.status-complete .build-name {
+    text-decoration: line-through;
+    color: var(--text-muted);
   }
 
   .build-desc {
     color: var(--text-muted);
-    font-weight: normal;
+    font-size: 0.85rem;
+    font-family: var(--font-ui);
+    margin: 0.4rem 0 0;
+    line-height: 1.5;
   }
 
   .build-materials {
     font-size: 0.8rem;
-    color: var(--text-muted);
+    color: var(--accent);
+    font-family: var(--font-ui);
+    margin: 0.25rem 0 0;
+  }
+
+  .build-screenshot {
+    margin-top: 0.75rem;
+  }
+
+  .screenshot-btn {
+    background: none;
+    border: 2px solid var(--border-light);
+    border-radius: 4px;
+    padding: 0;
+    cursor: zoom-in;
+    display: block;
+    overflow: hidden;
+    transition: border-color 0.15s;
+  }
+
+  .screenshot-btn:hover {
+    border-color: var(--link);
+  }
+
+  .screenshot-btn img {
+    display: block;
+    width: 100%;
+    max-width: 460px;
+    height: auto;
+  }
+
+  /* ===== LIGHTBOX ===== */
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    cursor: zoom-out;
+    padding: 2rem;
+  }
+
+  .lightbox img {
+    max-width: 90vw;
+    max-height: 85vh;
+    border-radius: 4px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+    object-fit: contain;
+  }
+
+  .lightbox-close {
+    position: fixed;
+    top: 1rem;
+    right: 1.5rem;
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 2rem;
+    cursor: pointer;
+    z-index: 1001;
+    line-height: 1;
+    opacity: 0.7;
+    transition: opacity 0.15s;
+  }
+
+  .lightbox-close:hover {
+    opacity: 1;
   }
 
   /* ===== STATUS TAGS ===== */
