@@ -2,36 +2,57 @@
   let phases = $state([]);
   let seeds = $state([]);
   let page = $state("home");
+  let activePhaseGroup = $state(null);
   let dark = $state(localStorage.getItem("oni-theme") === "dark");
 
-  // New phase form
   let newPhaseName = $state("");
   let newPhaseDesc = $state("");
-
-  // New build form (keyed by phase id)
   let buildForms = $state({});
   let lightboxImg = $state(null);
 
+  const chapterLabels = ["a", "b", "c", "d", "e", "f", "g", "h"];
+
+  let grouped = $derived(() => {
+    const groups = {};
+    for (const phase of phases) {
+      const g = phase.phase_group || "?";
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(phase);
+    }
+    return groups;
+  });
+
   function handleKeydown(e) {
-    if (e.key === 'Escape' && lightboxImg) {
+    if (e.key === "Escape" && lightboxImg) {
       lightboxImg = null;
     }
   }
 
   $effect(() => {
-    window.addEventListener('keydown', handleKeydown);
-    return () => window.removeEventListener('keydown', handleKeydown);
+    window.addEventListener("keydown", handleKeydown);
+    return () => window.removeEventListener("keydown", handleKeydown);
+  });
+
+  $effect(() => {
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
   });
 
   function toggleTheme() {
     dark = !dark;
     localStorage.setItem("oni-theme", dark ? "dark" : "light");
-    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
   }
 
-  $effect(() => {
-    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
-  });
+  function goHome() {
+    page = "home";
+    activePhaseGroup = null;
+    window.scrollTo(0, 0);
+  }
+
+  function goPhase(group) {
+    page = "phase";
+    activePhaseGroup = group;
+    window.scrollTo(0, 0);
+  }
 
   async function fetchPhases() {
     const res = await fetch("/api/phases");
@@ -117,16 +138,14 @@
   <header>
     <div class="container header-inner">
       <div class="header-left">
-        <button class="logo" onclick={() => page = "home"}>ONI Planner</button>
+        <button class="logo" onclick={goHome}>Colony Blueprint</button>
         <nav class="header-nav">
-          <button class:active={page === "home"} onclick={() => page = "home"}>Build Planner</button>
-          <button class:active={page === "design"} onclick={() => page = "design"}>Design</button>
-          <button class:active={page === "about"} onclick={() => page = "about"}>About</button>
+          <button class:active={page === "home"} onclick={goHome}>Home</button>
+          {#each Object.keys(grouped()) as group}
+            <button class:active={page === "phase" && activePhaseGroup === group} onclick={() => goPhase(group)}>Phase {group}</button>
+          {/each}
         </nav>
       </div>
-      <button class="theme-toggle" onclick={toggleTheme} title="Toggle light/dark mode">
-        {#if dark}Light{:else}Dark{/if}
-      </button>
     </div>
   </header>
 
@@ -134,56 +153,64 @@
     <main class="container">
       {#if page === "home"}
         <div class="page-heading">
-          <h1>Build Planner</h1>
-          <p class="lead">Plan and track your Oxygen Not Included colony builds by phase.</p>
+          <h1>Colony Blueprint</h1>
         </div>
 
-        <!-- Seeds -->
-      {#if seeds.length > 0}
-        <section class="wiki-section seeds-box">
-          <h2 class="section-heading">Saved Seeds</h2>
-          {#each seeds as seed}
-            <div class="seed-item">
-              <code class="seed-code">{seed.seed}</code>
-              {#if seed.name}<span class="seed-name"> — {seed.name}</span>{/if}
-              {#if seed.notes}<span class="seed-notes"> ({seed.notes})</span>{/if}
-            </div>
-          {/each}
-        </section>
-      {/if}
-
-      <!-- Add Phase -->
-        <section class="wiki-section">
-          <h2 class="section-heading">Create New Phase</h2>
-          <form onsubmit={(e) => { e.preventDefault(); addPhase(); }}>
-            <div class="form-row">
-              <div class="form-group">
-                <label for="phase-name">Phase Name</label>
-                <input type="text" id="phase-name" bind:value={newPhaseName} placeholder="e.g. Early Game, Mid Game, Space..." />
-              </div>
-              <div class="form-group">
-                <label for="phase-desc">Description</label>
-                <input type="text" id="phase-desc" bind:value={newPhaseDesc} placeholder="Goals for this phase" />
-              </div>
-            </div>
-            <button class="btn btn-primary" type="submit">Add Phase</button>
-          </form>
+        <section class="wiki-section intro-section">
+          <div class="intro-text">
+            <p>Hey, I'm <strong>Seth</strong>. This is my build guide for <em>Oxygen Not Included</em> — my strategies, priorities, and lessons learned from many colonies. This is how I play the game and what works for me. It's just for fun — I hope it helps you get started or gives you some new ideas. Enjoy the game with me!</p>
+          </div>
+          <div class="intro-image">
+            <img src="/oni-hero.png" alt="Oxygen Not Included" />
+          </div>
         </section>
 
-        <!-- Phases -->
-        {#if phases.length === 0}
-          <p class="empty">No phases yet. Create your first phase above to start planning your colony.</p>
+        <div class="home-screenshot">
+          <img src="/screenshots/cycle35-mess-hall.png" alt="Dupes enjoying a meal in the Great Hall" />
+          <span class="meta">Dupes enjoying a meal in the Great Hall</span>
+        </div>
+
+        {#if seeds.length > 0}
+          <section class="wiki-section">
+            <h2 class="section-heading">Saved Seeds</h2>
+            {#each seeds as seed}
+              <div class="seed-item">
+                <code class="seed-code">{seed.seed}</code>
+                {#if seed.name}<span class="seed-name"> — {seed.name}</span>{/if}
+                {#if seed.notes}<span class="seed-notes"> ({seed.notes})</span>{/if}
+              </div>
+            {/each}
+          </section>
         {/if}
 
-        {#each phases as phase, i}
-          <section class="wiki-section phase">
+        {#each Object.entries(grouped()) as [group, groupPhases]}
+          <section class="wiki-section">
+            <button class="phase-overview-card" onclick={() => goPhase(group)}>
+              <h2 class="section-heading">Phase {group}</h2>
+              <p class="phase-desc">{groupPhases.length} chapter{groupPhases.length > 1 ? "s" : ""}: {groupPhases.map((p, i) => `${group}${chapterLabels[i]}. ${p.name}`).join(" — ")}</p>
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: {Math.round(groupPhases.reduce((a, p) => a + p.builds.filter(b => b.status === 'complete').length, 0) / Math.max(groupPhases.reduce((a, p) => a + p.builds.length, 0), 1) * 100)}%"></div>
+              </div>
+              <span class="meta">{groupPhases.reduce((a, p) => a + p.builds.filter(b => b.status === "complete").length, 0)}/{groupPhases.reduce((a, p) => a + p.builds.length, 0)} builds complete</span>
+            </button>
+          </section>
+        {/each}
+
+
+      {:else if page === "phase" && activePhaseGroup}
+        <div class="page-heading">
+          <h1>Phase {activePhaseGroup}</h1>
+          <p class="lead"><button class="btn-link" onclick={goHome}>← Back to Home</button></p>
+        </div>
+
+        {#each (grouped()[activePhaseGroup] || []) as phase, j}
+          <section class="wiki-section phase" id="phase-{phase.id}">
             <div class="phase-header">
               <div class="phase-title-row">
                 <h2 class="section-heading">
-                  <span class="phase-number">{i + 1}.</span>
+                  <span class="phase-number">{activePhaseGroup}{chapterLabels[j]}.</span>
                   {phase.name}
                 </h2>
-                <button class="btn btn-danger btn-sm" onclick={() => deletePhase(phase.id)}>delete</button>
               </div>
               {#if phase.description}
                 <p class="phase-desc">{phase.description}</p>
@@ -194,7 +221,6 @@
               <span class="meta">{phaseProgress(phase)}% complete — {phase.builds.filter(b => b.status === "complete").length}/{phase.builds.length} builds</span>
             </div>
 
-            <!-- Builds list -->
             {#if phase.builds.length > 0}
               <div class="builds-list">
                 {#each phase.builds as build}
@@ -211,7 +237,6 @@
                       </button>
                       <span class="build-name">{build.name}</span>
                       <span class="priority-badge priority-{build.priority}">{build.priority}</span>
-                      <button class="btn-link-danger" onclick={() => deleteBuild(build.id)} title="Delete build">delete</button>
                     </div>
                     {#if build.description}
                       <p class="build-desc">{build.description}</p>
@@ -231,80 +256,118 @@
               </div>
             {/if}
 
-            <!-- Add build form -->
-            <div class="add-build">
-              <form onsubmit={(e) => { e.preventDefault(); addBuild(phase.id); }}>
-                <div class="form-row form-row-4">
-                  <input type="text" placeholder="Build name"
-                    value={(buildForms[phase.id] || {}).name}
-                    oninput={(e) => buildForms[phase.id].name = e.target.value} />
-                  <input type="text" placeholder="Description"
-                    value={(buildForms[phase.id] || {}).description}
-                    oninput={(e) => buildForms[phase.id].description = e.target.value} />
-                  <input type="text" placeholder="Materials"
-                    value={(buildForms[phase.id] || {}).materials}
-                    oninput={(e) => buildForms[phase.id].materials = e.target.value} />
-                  <select value={(buildForms[phase.id] || {}).priority}
-                    onchange={(e) => buildForms[phase.id].priority = e.target.value}>
-                    <option value="low">Low</option>
-                    <option value="normal">Normal</option>
-                    <option value="high">High</option>
-                    <option value="critical">Critical</option>
-                  </select>
-                </div>
-                <button class="btn btn-sm" type="submit">+ Add Build</button>
-              </form>
-            </div>
           </section>
         {/each}
 
       {:else if page === "design"}
         <div class="page-heading">
           <h1>Design System</h1>
-          <p class="lead">Visual reference for the ONI Planner interface.</p>
+          <p class="lead">Visual language for Colony Blueprint.</p>
         </div>
 
         <section class="wiki-section">
-          <h2 class="section-heading">Colors</h2>
-          <div class="swatches">
-            <div class="swatch" style="background: var(--link)"><span>Link</span></div>
-            <div class="swatch" style="background: var(--accent)"><span>Accent</span></div>
-            <div class="swatch" style="background: var(--danger)"><span>Danger</span></div>
-            <div class="swatch" style="background: var(--warning)"><span>Warning</span></div>
-            <div class="swatch" style="background: var(--success)"><span>Success</span></div>
+          <h2 class="section-heading">Palette</h2>
+          <div class="palette-grid">
+            <div class="palette-card">
+              <div class="palette-swatch" style="background: #2c3e50"></div>
+              <div class="palette-info"><span class="palette-name">Deep Space</span><span class="palette-hex">#2c3e50</span></div>
+            </div>
+            <div class="palette-card">
+              <div class="palette-swatch" style="background: #0645ad"></div>
+              <div class="palette-info"><span class="palette-name">Blueprint</span><span class="palette-hex">#0645ad</span></div>
+            </div>
+            <div class="palette-card">
+              <div class="palette-swatch" style="background: #14866d"></div>
+              <div class="palette-info"><span class="palette-name">Oxygen</span><span class="palette-hex">#14866d</span></div>
+            </div>
+            <div class="palette-card">
+              <div class="palette-swatch" style="background: #c0863a"></div>
+              <div class="palette-info"><span class="palette-name">Copper</span><span class="palette-hex">#c0863a</span></div>
+            </div>
+            <div class="palette-card">
+              <div class="palette-swatch" style="background: #8e4a4a"></div>
+              <div class="palette-info"><span class="palette-name">Magma</span><span class="palette-hex">#8e4a4a</span></div>
+            </div>
+            <div class="palette-card">
+              <div class="palette-swatch" style="background: #5b7a8a"></div>
+              <div class="palette-info"><span class="palette-name">Slate</span><span class="palette-hex">#5b7a8a</span></div>
+            </div>
           </div>
         </section>
 
         <section class="wiki-section">
           <h2 class="section-heading">Typography</h2>
-          <h1>Heading 1</h1>
-          <h2>Heading 2</h2>
-          <h3>Heading 3</h3>
-          <p>Body text — The quick brown fox jumps over the lazy dog.</p>
-          <p class="meta">Meta text for secondary information.</p>
-        </section>
-
-        <section class="wiki-section">
-          <h2 class="section-heading">Buttons</h2>
-          <div class="button-row">
-            <button class="btn btn-primary">Primary</button>
-            <button class="btn">Default</button>
-            <button class="btn btn-danger">Danger</button>
+          <div class="type-specimen">
+            <div class="type-row">
+              <span class="type-label">H1 — Page Title</span>
+              <h1 style="margin: 0">Colony Blueprint</h1>
+            </div>
+            <div class="type-row">
+              <span class="type-label">H2 — Section</span>
+              <h2 style="margin: 0; border: none; padding: 0">Phase 1: First Cycle</h2>
+            </div>
+            <div class="type-row">
+              <span class="type-label">H3 — Subsection</span>
+              <h3 style="margin: 0">Build Details</h3>
+            </div>
+            <div class="type-row">
+              <span class="type-label">Body</span>
+              <p style="margin: 0">Dig out space to the right of the pod for bathrooms. This area will later become the permanent plumbed bathrooms.</p>
+            </div>
+            <div class="type-row">
+              <span class="type-label">Meta</span>
+              <p class="meta" style="margin: 0">100% complete — 14/14 builds</p>
+            </div>
           </div>
         </section>
 
         <section class="wiki-section">
-          <h2 class="section-heading">Status &amp; Priority</h2>
-          <div class="button-row" style="margin-bottom: 1rem">
-            <span class="status-tag tag-planned">planned</span>
-            <span class="status-tag tag-progress">in progress</span>
-            <span class="status-tag tag-complete">complete</span>
+          <h2 class="section-heading">Controls</h2>
+          <div class="design-subsection">
+            <h3>Buttons</h3>
+            <div class="button-row">
+              <button class="btn btn-primary">Primary</button>
+              <button class="btn">Default</button>
+              <button class="btn btn-danger">Danger</button>
+              <button class="btn btn-sm">Small</button>
+            </div>
           </div>
-          <div class="button-row">
-            <span class="priority-badge priority-low">low</span>
-            <span class="priority-badge priority-normal">normal</span>
-            <span class="priority-badge priority-high">high</span>
-            <span class="priority-badge priority-critical">critical</span>
+          <div class="design-subsection">
+            <h3>Status</h3>
+            <div class="button-row">
+              <span class="status-tag tag-planned">planned</span>
+              <span class="status-tag tag-progress">in progress</span>
+              <span class="status-tag tag-complete">complete</span>
+            </div>
+          </div>
+          <div class="design-subsection">
+            <h3>Priority</h3>
+            <div class="button-row">
+              <span class="priority-badge priority-low">low</span>
+              <span class="priority-badge priority-normal">normal</span>
+              <span class="priority-badge priority-high">high</span>
+              <span class="priority-badge priority-critical">critical</span>
+            </div>
+          </div>
+          <div class="design-subsection">
+            <h3>Progress</h3>
+            <div class="progress-bar" style="max-width: 300px"><div class="progress-fill" style="width: 72%"></div></div>
+            <span class="meta">72% complete</span>
+          </div>
+        </section>
+
+        <section class="wiki-section">
+          <h2 class="section-heading">Build Card</h2>
+          <div class="builds-list" style="max-width: 500px">
+            <div class="build-card status-complete">
+              <div class="build-card-header">
+                <span class="status-tag tag-complete">complete</span>
+                <span class="build-name">Build 1 Outhouse</span>
+                <span class="priority-badge priority-critical">critical</span>
+              </div>
+              <p class="build-desc">ASAP — #1 priority. Dupes will soil the base if this is not up immediately.</p>
+              <p class="build-materials">Materials: Dirt</p>
+            </div>
           </div>
         </section>
 
@@ -313,10 +376,12 @@
           <h1>About</h1>
         </div>
         <section class="wiki-section">
-          <p><strong>ONI Planner</strong> helps you organize your <em>Oxygen Not Included</em> colony builds into phases.</p>
-          <p>Plan your builds from early game survival through to late-game rocketry. Track materials, set priorities, and mark progress as you go.</p>
+          <p>Hey, I'm <strong>Seth</strong>.</p>
+          <p>This is my build guide and recommendations for <em>Oxygen Not Included</em>. This is how I play the game — my strategies, my priorities, my mistakes and lessons learned along the way.</p>
+          <p>This is just for fun. I hope it helps you get started or gives you some new ideas for your own colony. Please enjoy the game with me!</p>
+          <p>Get the game: <a href="https://store.steampowered.com/app/457140/Oxygen_Not_Included/" target="_blank" rel="noreferrer">Oxygen Not Included on Steam</a></p>
           <hr />
-          <p class="meta">Built with Flask, SQLite, and Svelte.</p>
+          <p class="meta">Built with love, Flask, SQLite, and Svelte.</p>
         </section>
       {/if}
     </main>
@@ -331,18 +396,23 @@
 
   <footer>
     <div class="container footer-inner">
-      <span class="footer-brand">ONI Planner</span>
+      <span class="footer-brand">Colony Blueprint</span>
       <nav>
-        <button class="footer-link" class:active={page === "home"} onclick={() => page = "home"}>Planner</button>
         <button class="footer-link" class:active={page === "design"} onclick={() => page = "design"}>Design</button>
         <button class="footer-link" class:active={page === "about"} onclick={() => page = "about"}>About</button>
+        <button class="theme-toggle" onclick={toggleTheme} title="Toggle light/dark mode">
+          {#if dark}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          {:else}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          {/if}
+        </button>
       </nav>
     </div>
   </footer>
 </div>
 
 <style>
-  /* ===== LIGHT THEME (default) ===== */
   :global(:root), :global([data-theme="light"]) {
     --bg: #ffffff;
     --bg-secondary: #f6f6f6;
@@ -358,17 +428,12 @@
     --danger-hover: #b32424;
     --warning: #fc3;
     --success: #14866d;
-    --success-bg: #d5fdf4;
-    --highlight: #fee7cd;
-    --font: Georgia, 'Times New Roman', serif;
-    --font-ui: -apple-system, 'Segoe UI', sans-serif;
+    --font: Georgia, "Times New Roman", serif;
+    --font-ui: -apple-system, "Segoe UI", sans-serif;
     --radius: 2px;
-    --section-bg: #ffffff;
     --section-border: #a2a9b1;
     --header-bg: #f8f9fa;
     --header-border: #a7d7f9;
-    --table-header-bg: #eaecf0;
-    --table-border: #a2a9b1;
     --tag-planned-bg: #eaecf0;
     --tag-planned-fg: #54595d;
     --tag-progress-bg: #fef6e7;
@@ -377,7 +442,6 @@
     --tag-complete-fg: #14866d;
   }
 
-  /* ===== DARK THEME ===== */
   :global([data-theme="dark"]) {
     --bg: #101418;
     --bg-secondary: #1a1e24;
@@ -393,17 +457,12 @@
     --danger-hover: #ff4c4c;
     --warning: #ffcc33;
     --success: #3ddc97;
-    --success-bg: rgba(61, 220, 151, 0.15);
-    --highlight: rgba(255, 204, 51, 0.15);
-    --font: Georgia, 'Times New Roman', serif;
-    --font-ui: -apple-system, 'Segoe UI', sans-serif;
+    --font: Georgia, "Times New Roman", serif;
+    --font-ui: -apple-system, "Segoe UI", sans-serif;
     --radius: 2px;
-    --section-bg: #1a1e24;
     --section-border: #3a3f47;
     --header-bg: #1a1e24;
     --header-border: #3a5f8a;
-    --table-header-bg: #22272e;
-    --table-border: #3a3f47;
     --tag-planned-bg: #2a2f36;
     --tag-planned-fg: #8a9199;
     --tag-progress-bg: rgba(255, 204, 51, 0.15);
@@ -412,9 +471,7 @@
     --tag-complete-fg: #3ddc97;
   }
 
-  :global(*, *::before, *::after) {
-    box-sizing: border-box;
-  }
+  :global(*, *::before, *::after) { box-sizing: border-box; }
 
   :global(body) {
     margin: 0;
@@ -439,7 +496,7 @@
     width: 100%;
   }
 
-  /* ===== HEADER — wiki-style tab bar ===== */
+  /* Header */
   header {
     background: var(--header-bg);
     border-bottom: 1px solid var(--header-border);
@@ -449,7 +506,6 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0;
   }
 
   .header-left {
@@ -470,9 +526,7 @@
     border-right: 1px solid var(--border-light);
   }
 
-  .header-nav {
-    display: flex;
-  }
+  .header-nav { display: flex; }
 
   .header-nav button {
     background: none;
@@ -497,23 +551,7 @@
     font-weight: 600;
   }
 
-  .theme-toggle {
-    background: none;
-    border: 1px solid var(--border-light);
-    font-family: var(--font-ui);
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    cursor: pointer;
-    padding: 0.25rem 0.65rem;
-    border-radius: var(--radius);
-  }
-
-  .theme-toggle:hover {
-    color: var(--text);
-    background: var(--surface);
-  }
-
-  /* ===== CONTENT AREA ===== */
+  /* Content */
   .content-area {
     flex: 1;
     background: var(--bg);
@@ -529,7 +567,7 @@
     padding-bottom: 3rem;
   }
 
-  /* ===== PAGE HEADING ===== */
+  /* Page heading */
   .page-heading {
     border-bottom: 1px solid var(--section-border);
     margin-bottom: 1.25rem;
@@ -551,10 +589,8 @@
     font-family: var(--font-ui);
   }
 
-  /* ===== WIKI SECTIONS ===== */
-  .wiki-section {
-    margin-bottom: 1.5rem;
-  }
+  /* Sections */
+  .wiki-section { margin-bottom: 1.5rem; }
 
   .section-heading {
     font-family: var(--font);
@@ -572,13 +608,9 @@
     font-size: 1rem;
     margin: 1rem 0 0.5rem;
     color: var(--text);
-    text-transform: none;
-    letter-spacing: normal;
   }
 
-  p {
-    margin: 0.5rem 0;
-  }
+  p { margin: 0.5rem 0; }
 
   hr {
     border: none;
@@ -592,7 +624,46 @@
     font-family: var(--font-ui);
   }
 
-  /* ===== SEEDS ===== */
+  /* Seeds */
+  /* Intro & Home */
+  .intro-section {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+  }
+
+  .intro-text {
+    flex: 1;
+  }
+
+  .intro-image {
+    flex-shrink: 0;
+    width: 130px;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid var(--border-light);
+  }
+
+  .intro-image img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .home-screenshot {
+    margin-bottom: 1.5rem;
+    text-align: center;
+  }
+
+  .home-screenshot img {
+    display: block;
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto 0.35rem;
+    border-radius: 4px;
+    border: 1px solid var(--border-light);
+  }
+
   .seed-item {
     margin: 0.4rem 0;
     font-family: var(--font-ui);
@@ -602,23 +673,86 @@
   .seed-code {
     font-family: ui-monospace, Consolas, monospace;
     font-size: 0.85rem;
-    background: var(--table-header-bg);
+    background: var(--surface);
     padding: 0.15rem 0.5rem;
     border-radius: var(--radius);
     border: 1px solid var(--border-light);
     user-select: all;
   }
 
-  .seed-name {
-    font-weight: 600;
+  .seed-name { font-weight: 600; }
+  .seed-notes { color: var(--text-muted); font-size: 0.85rem; }
+
+  /* Phase overview cards */
+  .phase-overview-card {
+    display: block;
+    width: 100%;
+    cursor: pointer;
+    padding: 0.75rem;
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    background: var(--bg);
+    text-align: left;
+    font-family: inherit;
+    transition: border-color 0.15s;
   }
 
-  .seed-notes {
+  .phase-overview-card:hover {
+    border-color: var(--link);
+  }
+
+  .phase-overview-card .section-heading {
+    margin-bottom: 0.5rem;
+  }
+
+  /* Back link */
+  .btn-link {
+    background: none;
+    border: none;
+    color: var(--link);
+    cursor: pointer;
+    font-family: var(--font-ui);
+    font-size: 0.9rem;
+    padding: 0;
+    text-decoration: underline;
+  }
+
+  .btn-link:hover { color: var(--link-hover); }
+
+  /* Phase */
+  .phase-header { margin-bottom: 0.75rem; }
+
+  .phase-title-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+
+  .phase-title-row .section-heading { flex: 1; }
+  .phase-number { color: var(--text-muted); }
+
+  .phase-desc {
+    margin: 0.15rem 0 0.5rem;
     color: var(--text-muted);
-    font-size: 0.85rem;
+    font-size: 0.9rem;
   }
 
-  /* ===== FORMS ===== */
+  /* Progress */
+  .progress-bar {
+    height: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    overflow: hidden;
+    margin-bottom: 0.25rem;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--success);
+    transition: width 0.3s;
+  }
+
+  /* Forms */
   .form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -626,9 +760,7 @@
     margin-bottom: 0.5rem;
   }
 
-  .form-row-4 {
-    grid-template-columns: 2fr 2fr 2fr 1fr;
-  }
+  .form-row-4 { grid-template-columns: 2fr 2fr 2fr 1fr; }
 
   .form-group label {
     display: block;
@@ -655,7 +787,7 @@
     border-color: var(--link);
   }
 
-  /* ===== BUTTONS ===== */
+  /* Buttons */
   .btn {
     padding: 0.35rem 0.85rem;
     border: 1px solid var(--surface-border);
@@ -669,36 +801,15 @@
     transition: background 0.1s;
   }
 
-  .btn:hover {
-    background: var(--surface);
-  }
+  .btn:hover { background: var(--surface); }
 
-  .btn-primary {
-    background: var(--link);
-    color: #fff;
-    border-color: var(--link);
-  }
+  .btn-primary { background: var(--link); color: #fff; border-color: var(--link); }
+  .btn-primary:hover { background: var(--link-hover); border-color: var(--link-hover); }
 
-  .btn-primary:hover {
-    background: var(--link-hover);
-    border-color: var(--link-hover);
-  }
+  .btn-danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+  .btn-danger:hover { background: var(--danger); color: #fff; }
 
-  .btn-danger {
-    background: transparent;
-    color: var(--danger);
-    border-color: var(--danger);
-  }
-
-  .btn-danger:hover {
-    background: var(--danger);
-    color: #fff;
-  }
-
-  .btn-sm {
-    padding: 0.2rem 0.6rem;
-    font-size: 0.8rem;
-  }
+  .btn-sm { padding: 0.2rem 0.6rem; font-size: 0.8rem; }
 
   .btn-link-danger {
     background: none;
@@ -711,58 +822,11 @@
     text-decoration: underline;
   }
 
-  .btn-link-danger:hover {
-    color: var(--danger-hover);
-  }
+  .btn-link-danger:hover { color: var(--danger-hover); }
 
-  .button-row {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    flex-wrap: wrap;
-  }
+  .button-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
 
-  /* ===== PHASE ===== */
-  .phase-header {
-    margin-bottom: 0.75rem;
-  }
-
-  .phase-title-row {
-    display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
-  }
-
-  .phase-title-row .section-heading {
-    flex: 1;
-  }
-
-  .phase-number {
-    color: var(--text-muted);
-  }
-
-  .phase-desc {
-    margin: 0.15rem 0 0.5rem;
-    color: var(--text-muted);
-    font-size: 0.9rem;
-  }
-
-  /* ===== PROGRESS ===== */
-  .progress-bar {
-    height: 4px;
-    background: var(--surface);
-    border: 1px solid var(--border-light);
-    overflow: hidden;
-    margin-bottom: 0.25rem;
-  }
-
-  .progress-fill {
-    height: 100%;
-    background: var(--success);
-    transition: width 0.3s;
-  }
-
-  /* ===== BUILD CARDS ===== */
+  /* Build cards */
   .builds-list {
     display: flex;
     flex-direction: column;
@@ -784,16 +848,8 @@
     font-family: var(--font-ui);
   }
 
-  .build-name {
-    font-weight: 600;
-    font-size: 0.9rem;
-    flex: 1;
-  }
+  .build-name { font-weight: 600; font-size: 0.9rem; flex: 1; }
 
-  .build-card.status-complete .build-name {
-    text-decoration: line-through;
-    color: var(--text-muted);
-  }
 
   .build-desc {
     color: var(--text-muted);
@@ -810,9 +866,7 @@
     margin: 0.25rem 0 0;
   }
 
-  .build-screenshot {
-    margin-top: 0.75rem;
-  }
+  .build-screenshot { margin-top: 0.75rem; }
 
   .screenshot-btn {
     background: none;
@@ -825,9 +879,7 @@
     transition: border-color 0.15s;
   }
 
-  .screenshot-btn:hover {
-    border-color: var(--link);
-  }
+  .screenshot-btn:hover { border-color: var(--link); }
 
   .screenshot-btn img {
     display: block;
@@ -836,7 +888,7 @@
     height: auto;
   }
 
-  /* ===== LIGHTBOX ===== */
+  /* Lightbox */
   .lightbox {
     position: fixed;
     inset: 0;
@@ -872,17 +924,10 @@
     transition: opacity 0.15s;
   }
 
-  .lightbox-close:hover {
-    opacity: 1;
-  }
+  .lightbox-close:hover { opacity: 1; }
 
-  /* ===== STATUS TAGS ===== */
-  .status-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0;
-  }
+  /* Status tags */
+  .status-btn { background: none; border: none; cursor: pointer; padding: 0; }
 
   .status-tag {
     display: inline-block;
@@ -893,22 +938,11 @@
     border-radius: var(--radius);
   }
 
-  .tag-planned {
-    background: var(--tag-planned-bg);
-    color: var(--tag-planned-fg);
-  }
+  .tag-planned { background: var(--tag-planned-bg); color: var(--tag-planned-fg); }
+  .tag-progress { background: var(--tag-progress-bg); color: var(--tag-progress-fg); }
+  .tag-complete { background: var(--tag-complete-bg); color: var(--tag-complete-fg); }
 
-  .tag-progress {
-    background: var(--tag-progress-bg);
-    color: var(--tag-progress-fg);
-  }
-
-  .tag-complete {
-    background: var(--tag-complete-bg);
-    color: var(--tag-complete-fg);
-  }
-
-  /* ===== PRIORITY BADGES ===== */
+  /* Priority badges */
   .priority-badge {
     font-size: 0.7rem;
     font-weight: 600;
@@ -927,7 +961,7 @@
   :global([data-theme="dark"]) .priority-normal { background: rgba(107, 158, 255, 0.15); color: #6b9eff; }
   :global([data-theme="dark"]) .priority-critical { background: rgba(255, 107, 107, 0.15); color: #ff6b6b; }
 
-  /* ===== ADD BUILD ===== */
+  /* Add build */
   .add-build {
     border-top: 1px solid var(--border-light);
     margin-top: 0.5rem;
@@ -941,37 +975,76 @@
     font-style: italic;
   }
 
-  /* ===== DESIGN PAGE ===== */
-  .swatches {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
+  /* Design page */
+  .palette-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
   }
 
-  .swatch {
-    width: 80px;
-    height: 60px;
-    border-radius: var(--radius);
-    display: flex;
-    align-items: flex-end;
-    padding: 0.3rem;
+  .palette-card {
     border: 1px solid var(--border-light);
+    border-radius: 4px;
+    overflow: hidden;
   }
 
-  .swatch span {
-    font-size: 0.65rem;
-    font-weight: 600;
+  .palette-swatch {
+    height: 64px;
+  }
+
+  .palette-info {
+    padding: 0.5rem 0.6rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     font-family: var(--font-ui);
-    color: white;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    font-size: 0.8rem;
   }
 
-  /* ===== FOOTER ===== */
+  .palette-name { font-weight: 600; color: var(--text); }
+  .palette-hex { color: var(--text-muted); font-family: ui-monospace, Consolas, monospace; font-size: 0.75rem; }
+
+  .type-specimen {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .type-row {
+    display: flex;
+    align-items: baseline;
+    gap: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .type-row:last-child { border-bottom: none; padding-bottom: 0; }
+
+  .type-label {
+    flex-shrink: 0;
+    width: 120px;
+    font-family: var(--font-ui);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
+
+  .design-subsection {
+    margin-bottom: 1.25rem;
+  }
+
+  .design-subsection:last-child { margin-bottom: 0; }
+
+  /* Footer */
   footer {
     background: var(--header-bg);
     border-top: 1px solid var(--border-light);
     padding: 0.75rem 0;
-    margin-top: auto;
+    position: sticky;
+    bottom: 0;
+    z-index: 100;
   }
 
   .footer-inner {
@@ -987,10 +1060,7 @@
     font-family: var(--font-ui);
   }
 
-  footer nav {
-    display: flex;
-    gap: 0.15rem;
-  }
+  footer nav { display: flex; gap: 0.15rem; }
 
   .footer-link {
     background: none;
@@ -1004,9 +1074,7 @@
     transition: color 0.1s;
   }
 
-  .footer-link:hover {
-    color: var(--link-hover);
-  }
+  .footer-link:hover { color: var(--link-hover); }
 
   .footer-link.active {
     font-weight: 600;
@@ -1014,29 +1082,34 @@
     color: var(--text);
   }
 
+  .theme-toggle {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.3rem 0.6rem;
+    display: flex;
+    align-items: center;
+    border-radius: var(--radius);
+    transition: color 0.1s;
+  }
+
+  .theme-toggle:hover {
+    color: var(--text);
+    background: var(--surface);
+  }
+
   @media (max-width: 600px) {
-    .form-row, .form-row-4 {
-      grid-template-columns: 1fr;
-    }
-    .header-left {
-      flex-direction: column;
-    }
+    .form-row, .form-row-4 { grid-template-columns: 1fr; }
+    .header-left { flex-direction: column; }
     .logo {
       border-right: none;
       border-bottom: 1px solid var(--border-light);
       margin-right: 0;
       padding: 0.5rem 0;
     }
-    .content-area {
-      border: none;
-    }
-    .swatches {
-      flex-wrap: wrap;
-    }
-    .phase-title-row {
-      flex-wrap: wrap;
-    }
-    .col-status { width: auto; }
-    .col-priority { width: auto; }
+    .content-area { border: none; }
+    .swatches { flex-wrap: wrap; }
+    .phase-title-row { flex-wrap: wrap; }
   }
 </style>
